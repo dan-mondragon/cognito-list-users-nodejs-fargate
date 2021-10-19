@@ -12,7 +12,7 @@ var uploadToBucket = function(fileName){
         let s3 = new AWS.S3();
         const fileContent = fs.readFileSync(fileName, 'utf8');
         const params = {
-            Bucket: 'el-patron-confirmed-users-prd',
+            Bucket: 'cognito-users',
             Key: generateFileName(),
             Body: fileContent
         }
@@ -117,7 +117,7 @@ var generateFileName = function(){
     let day = dateObj.getUTCDate();
     let year = dateObj.getUTCFullYear();
 
-    return `usuarios_patron-${year}-${month}-${day}.csv`;
+    return `usuarios-${year}-${month}-${day}.csv`;
 }
 
 var getUsers = async function() {

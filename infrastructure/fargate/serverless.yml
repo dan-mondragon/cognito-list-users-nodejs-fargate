@@ -48,7 +48,7 @@ resources:
         LaunchType: FARGATE
         LoadBalancers:
           -
-            ContainerName: el-patron-list-users
+            ContainerName: cognito-list-users
             ContainerPort: 8080
             TargetGroupArn: !Ref ListUsersLoadBalancerTargetGroup
         NetworkConfiguration:
@@ -74,14 +74,14 @@ resources:
       Properties:
         ContainerDefinitions:
           -
-            Name: el-patron-list-users
+            Name: cognito-list-users
             Essential: true
-            Image: 698486729085.dkr.ecr.us-east-1.amazonaws.com/el-patron-list-users:latest
+            Image: {ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/cognito-list-users:latest
             LogConfiguration:
                 LogDriver: awslogs
                 Options:
                   awslogs-group: !Ref ListUsersLogGroup
-                  awslogs-stream-prefix: el-patron-list-users-container
+                  awslogs-stream-prefix: cognito-list-users-container
                   awslogs-region: !Ref AWS::Region
             PortMappings:
               -
@@ -89,9 +89,9 @@ resources:
                 HostPort: 8080
                 Protocol: tcp
         Cpu: '256'
-        ExecutionRoleArn: arn:aws:iam::698486729085:role/GBMAmazonECSTaskElPatronListUsersExecutionRole
+        ExecutionRoleArn: arn:aws:iam::{ACCOUNT}:role/GBMAmazonECSTaskListUsersExecutionRole
         Memory: '512'
         NetworkMode: awsvpc
         RequiresCompatibilities:
           -  FARGATE
-        TaskRoleArn: arn:aws:iam::698486729085:role/GBMAmazonECSTaskElPatronListUsersExecutionRole
+        TaskRoleArn: arn:aws:iam::{ACCOUNT}:role/GBMAmazonECSTaskListUsersExecutionRole

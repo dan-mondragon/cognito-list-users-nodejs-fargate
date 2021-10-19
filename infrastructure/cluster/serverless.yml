@@ -10,10 +10,10 @@ provider:
 
 resources:
   Resources:
-    ElPatronListUsersRepository:
+    ListUsersRepository:
       Type: AWS::ECR::Repository
       Properties:
-        RepositoryName: el-patron-list-users
+        RepositoryName: cognito-list-users
 
     ListUsersEcsCluster:
       Type: AWS::ECS::Cluster
