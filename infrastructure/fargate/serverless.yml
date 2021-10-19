@@ -1,0 +1,97 @@
+---
+service: list-users-fargate
+
+frameworkVersion: '^2.x'
+
+provider:
+  name: aws
+  stage: ${opt:env, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+
+resources:
+  Resources:
+    ListUsersLoadBalancerTargetGroup:
+      Type: AWS::ElasticLoadBalancingV2::TargetGroup
+      Properties:
+        HealthCheckEnabled: true
+        HealthCheckPort: 8080
+        HealthCheckProtocol: HTTP
+        Port: 8080
+        Protocol: HTTP
+        TargetType: ip
+        VpcId:
+          Fn::ImportValue: VPC
+
+    ListUsersLoadBalancerListener:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties:
+        DefaultActions:
+          - Order: 1
+            TargetGroupArn: !Ref ListUsersLoadBalancerTargetGroup
+            Type: forward
+        LoadBalancerArn:
+          Fn::ImportValue: ListUsersApplicationLoadBalancer
+        Port: 8080
+        Protocol: HTTP
+      DependsOn:
+        - ListUsersLoadBalancerTargetGroup
+
+    ListUsersService:
+      Type: AWS::ECS::Service
+      Properties:
+        Cluster:
+          Fn::ImportValue: ListUsersEcsCluster
+        DeploymentController:
+          Type: ECS
+        DesiredCount: 1
+        HealthCheckGracePeriodSeconds: 10
+        LaunchType: FARGATE
+        LoadBalancers:
+          -
+            ContainerName: el-patron-list-users
+            ContainerPort: 8080
+            TargetGroupArn: !Ref ListUsersLoadBalancerTargetGroup
+        NetworkConfiguration:
+            AwsvpcConfiguration:
+              SecurityGroups:
+                -
+                  Fn::ImportValue: ListUsersSecurityGroup
+              Subnets:
+                -
+                  Fn::ImportValue: PrivateSubnet1AZ1
+                -
+                  Fn::ImportValue: PrivateSubnet1AZ2
+        TaskDefinition:
+          Ref: ListUsersTaskDefinition
+
+    ListUsersLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        RetentionInDays: 7
+
+    ListUsersTaskDefinition:
+      Type: AWS::ECS::TaskDefinition
+      Properties:
+        ContainerDefinitions:
+          -
+            Name: el-patron-list-users
+            Essential: true
+            Image: 698486729085.dkr.ecr.us-east-1.amazonaws.com/el-patron-list-users:latest
+            LogConfiguration:
+                LogDriver: awslogs
+                Options:
+                  awslogs-group: !Ref ListUsersLogGroup
+                  awslogs-stream-prefix: el-patron-list-users-container
+                  awslogs-region: !Ref AWS::Region
+            PortMappings:
+              -
+                ContainerPort: 8080
+                HostPort: 8080
+                Protocol: tcp
+        Cpu: '256'
+        ExecutionRoleArn: arn:aws:iam::698486729085:role/GBMAmazonECSTaskElPatronListUsersExecutionRole
+        Memory: '512'
+        NetworkMode: awsvpc
+        RequiresCompatibilities:
+          -  FARGATE
+        TaskRoleArn: arn:aws:iam::698486729085:role/GBMAmazonECSTaskElPatronListUsersExecutionRole

@@ -1,0 +1,454 @@
+{
+  "service": {
+    "service": "list-users-fargate",
+    "serviceObject": {
+      "name": "list-users-fargate"
+    },
+    "provider": {
+      "name": "aws",
+      "stage": "dev",
+      "region": "us-east-1",
+      "variableSyntax": "\\${([^{}:]+?(?:\\(|:)(?:[^:{}][^{}]*?)?)}",
+      "versionFunctions": true,
+      "compiledCloudFormationTemplate": {
+        "AWSTemplateFormatVersion": "2010-09-09",
+        "Description": "The AWS CloudFormation template for this Serverless application",
+        "Resources": {
+          "ServerlessDeploymentBucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+              "BucketEncryption": {
+                "ServerSideEncryptionConfiguration": [
+                  {
+                    "ServerSideEncryptionByDefault": {
+                      "SSEAlgorithm": "AES256"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "ServerlessDeploymentBucketPolicy": {
+            "Type": "AWS::S3::BucketPolicy",
+            "Properties": {
+              "Bucket": {
+                "Ref": "ServerlessDeploymentBucket"
+              },
+              "PolicyDocument": {
+                "Statement": [
+                  {
+                    "Action": "s3:*",
+                    "Effect": "Deny",
+                    "Principal": "*",
+                    "Resource": [
+                      {
+                        "Fn::Join": [
+                          "",
+                          [
+                            "arn:",
+                            {
+                              "Ref": "AWS::Partition"
+                            },
+                            ":s3:::",
+                            {
+                              "Ref": "ServerlessDeploymentBucket"
+                            },
+                            "/*"
+                          ]
+                        ]
+                      },
+                      {
+                        "Fn::Join": [
+                          "",
+                          [
+                            "arn:",
+                            {
+                              "Ref": "AWS::Partition"
+                            },
+                            ":s3:::",
+                            {
+                              "Ref": "ServerlessDeploymentBucket"
+                            }
+                          ]
+                        ]
+                      }
+                    ],
+                    "Condition": {
+                      "Bool": {
+                        "aws:SecureTransport": false
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "ListUsersLoadBalancerTargetGroup": {
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+            "Properties": {
+              "HealthCheckEnabled": true,
+              "HealthCheckPort": 8080,
+              "HealthCheckProtocol": "HTTP",
+              "Port": 8080,
+              "Protocol": "HTTP",
+              "TargetType": "ip",
+              "VpcId": {
+                "Fn::ImportValue": "VPC"
+              }
+            }
+          },
+          "ListUsersLoadBalancerListener": {
+            "Type": "AWS::ElasticLoadBalancingV2::Listener",
+            "Properties": {
+              "DefaultActions": [
+                {
+                  "Order": 1,
+                  "TargetGroupArn": {
+                    "Ref": "ListUsersLoadBalancerTargetGroup"
+                  },
+                  "Type": "forward"
+                }
+              ],
+              "LoadBalancerArn": {
+                "Fn::ImportValue": "ListUsersApplicationLoadBalancer"
+              },
+              "Port": 8080,
+              "Protocol": "HTTP"
+            },
+            "DependsOn": [
+              "ListUsersLoadBalancerTargetGroup"
+            ]
+          },
+          "ListUsersService": {
+            "Type": "AWS::ECS::Service",
+            "Properties": {
+              "Cluster": {
+                "Fn::ImportValue": "ListUsersEcsCluster"
+              },
+              "DeploymentController": {
+                "Type": "ECS"
+              },
+              "DesiredCount": 1,
+              "HealthCheckGracePeriodSeconds": 10,
+              "LaunchType": "FARGATE",
+              "LoadBalancers": [
+                {
+                  "ContainerName": "el-patron-list-users",
+                  "ContainerPort": 8080,
+                  "TargetGroupArn": {
+                    "Ref": "ListUsersLoadBalancerTargetGroup"
+                  }
+                }
+              ],
+              "NetworkConfiguration": {
+                "AwsvpcConfiguration": {
+                  "SecurityGroups": [
+                    {
+                      "Fn::ImportValue": "ListUsersSecurityGroup"
+                    }
+                  ],
+                  "Subnets": [
+                    {
+                      "Fn::ImportValue": "PrivateSubnet1AZ1"
+                    },
+                    {
+                      "Fn::ImportValue": "PrivateSubnet1AZ2"
+                    }
+                  ]
+                }
+              },
+              "TaskDefinition": {
+                "Ref": "ListUsersTaskDefinition"
+              }
+            }
+          },
+          "ListUsersLogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+              "RetentionInDays": 7
+            }
+          },
+          "ListUsersTaskDefinition": {
+            "Type": "AWS::ECS::TaskDefinition",
+            "Properties": {
+              "ContainerDefinitions": [
+                {
+                  "Name": "el-patron-list-users",
+                  "Essential": true,
+                  "Image": "227303381114.dkr.ecr.us-east-1.amazonaws.com/el-patron-list-users:latest",
+                  "LogConfiguration": {
+                    "LogDriver": "awslogs",
+                    "Options": {
+                      "awslogs-group": {
+                        "Ref": "ListUsersLogGroup"
+                      },
+                      "awslogs-stream-prefix": "el-patron-list-users-container",
+                      "awslogs-region": {
+                        "Ref": "AWS::Region"
+                      }
+                    }
+                  },
+                  "PortMappings": [
+                    {
+                      "ContainerPort": 8080,
+                      "HostPort": 8080,
+                      "Protocol": "tcp"
+                    }
+                  ]
+                }
+              ],
+              "Cpu": "256",
+              "ExecutionRoleArn": "arn:aws:iam::227303381114:role/GBMAmazonECSTaskElPatronListUsersExecutionRole",
+              "Memory": "512",
+              "NetworkMode": "awsvpc",
+              "RequiresCompatibilities": [
+                "FARGATE"
+              ],
+              "TaskRoleArn": "arn:aws:iam::227303381114:role/GBMAmazonECSTaskElPatronListUsersExecutionRole"
+            }
+          }
+        },
+        "Outputs": {
+          "ServerlessDeploymentBucketName": {
+            "Value": {
+              "Ref": "ServerlessDeploymentBucket"
+            }
+          }
+        }
+      },
+      "coreCloudFormationTemplate": {
+        "AWSTemplateFormatVersion": "2010-09-09",
+        "Description": "The AWS CloudFormation template for this Serverless application",
+        "Resources": {
+          "ServerlessDeploymentBucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+              "BucketEncryption": {
+                "ServerSideEncryptionConfiguration": [
+                  {
+                    "ServerSideEncryptionByDefault": {
+                      "SSEAlgorithm": "AES256"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "ServerlessDeploymentBucketPolicy": {
+            "Type": "AWS::S3::BucketPolicy",
+            "Properties": {
+              "Bucket": {
+                "Ref": "ServerlessDeploymentBucket"
+              },
+              "PolicyDocument": {
+                "Statement": [
+                  {
+                    "Action": "s3:*",
+                    "Effect": "Deny",
+                    "Principal": "*",
+                    "Resource": [
+                      {
+                        "Fn::Join": [
+                          "",
+                          [
+                            "arn:",
+                            {
+                              "Ref": "AWS::Partition"
+                            },
+                            ":s3:::",
+                            {
+                              "Ref": "ServerlessDeploymentBucket"
+                            },
+                            "/*"
+                          ]
+                        ]
+                      },
+                      {
+                        "Fn::Join": [
+                          "",
+                          [
+                            "arn:",
+                            {
+                              "Ref": "AWS::Partition"
+                            },
+                            ":s3:::",
+                            {
+                              "Ref": "ServerlessDeploymentBucket"
+                            }
+                          ]
+                        ]
+                      }
+                    ],
+                    "Condition": {
+                      "Bool": {
+                        "aws:SecureTransport": false
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "Outputs": {
+          "ServerlessDeploymentBucketName": {
+            "Value": {
+              "Ref": "ServerlessDeploymentBucket"
+            }
+          }
+        }
+      }
+    },
+    "pluginsData": {},
+    "functions": {},
+    "resources": {
+      "Resources": {
+        "ListUsersLoadBalancerTargetGroup": {
+          "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+          "Properties": {
+            "HealthCheckEnabled": true,
+            "HealthCheckPort": 8080,
+            "HealthCheckProtocol": "HTTP",
+            "Port": 8080,
+            "Protocol": "HTTP",
+            "TargetType": "ip",
+            "VpcId": {
+              "Fn::ImportValue": "VPC"
+            }
+          }
+        },
+        "ListUsersLoadBalancerListener": {
+          "Type": "AWS::ElasticLoadBalancingV2::Listener",
+          "Properties": {
+            "DefaultActions": [
+              {
+                "Order": 1,
+                "TargetGroupArn": {
+                  "Ref": "ListUsersLoadBalancerTargetGroup"
+                },
+                "Type": "forward"
+              }
+            ],
+            "LoadBalancerArn": {
+              "Fn::ImportValue": "ListUsersApplicationLoadBalancer"
+            },
+            "Port": 8080,
+            "Protocol": "HTTP"
+          },
+          "DependsOn": [
+            "ListUsersLoadBalancerTargetGroup"
+          ]
+        },
+        "ListUsersService": {
+          "Type": "AWS::ECS::Service",
+          "Properties": {
+            "Cluster": {
+              "Fn::ImportValue": "ListUsersEcsCluster"
+            },
+            "DeploymentController": {
+              "Type": "ECS"
+            },
+            "DesiredCount": 1,
+            "HealthCheckGracePeriodSeconds": 10,
+            "LaunchType": "FARGATE",
+            "LoadBalancers": [
+              {
+                "ContainerName": "el-patron-list-users",
+                "ContainerPort": 8080,
+                "TargetGroupArn": {
+                  "Ref": "ListUsersLoadBalancerTargetGroup"
+                }
+              }
+            ],
+            "NetworkConfiguration": {
+              "AwsvpcConfiguration": {
+                "SecurityGroups": [
+                  {
+                    "Fn::ImportValue": "ListUsersSecurityGroup"
+                  }
+                ],
+                "Subnets": [
+                  {
+                    "Fn::ImportValue": "PrivateSubnet1AZ1"
+                  },
+                  {
+                    "Fn::ImportValue": "PrivateSubnet1AZ2"
+                  }
+                ]
+              }
+            },
+            "TaskDefinition": {
+              "Ref": "ListUsersTaskDefinition"
+            }
+          }
+        },
+        "ListUsersLogGroup": {
+          "Type": "AWS::Logs::LogGroup",
+          "Properties": {
+            "RetentionInDays": 7
+          }
+        },
+        "ListUsersTaskDefinition": {
+          "Type": "AWS::ECS::TaskDefinition",
+          "Properties": {
+            "ContainerDefinitions": [
+              {
+                "Name": "el-patron-list-users",
+                "Essential": true,
+                "Image": "227303381114.dkr.ecr.us-east-1.amazonaws.com/el-patron-list-users:latest",
+                "LogConfiguration": {
+                  "LogDriver": "awslogs",
+                  "Options": {
+                    "awslogs-group": {
+                      "Ref": "ListUsersLogGroup"
+                    },
+                    "awslogs-stream-prefix": "el-patron-list-users-container",
+                    "awslogs-region": {
+                      "Ref": "AWS::Region"
+                    }
+                  }
+                },
+                "PortMappings": [
+                  {
+                    "ContainerPort": 8080,
+                    "HostPort": 8080,
+                    "Protocol": "tcp"
+                  }
+                ]
+              }
+            ],
+            "Cpu": "256",
+            "ExecutionRoleArn": "arn:aws:iam::227303381114:role/GBMAmazonECSTaskElPatronListUsersExecutionRole",
+            "Memory": "512",
+            "NetworkMode": "awsvpc",
+            "RequiresCompatibilities": [
+              "FARGATE"
+            ],
+            "TaskRoleArn": "arn:aws:iam::227303381114:role/GBMAmazonECSTaskElPatronListUsersExecutionRole"
+          }
+        }
+      },
+      "Outputs": {}
+    },
+    "configValidationMode": "warn",
+    "serviceFilename": "serverless.yml",
+    "layers": {},
+    "initialServerlessConfig": {
+      "service": {
+        "$ref": "$[\"service\"][\"serviceObject\"]"
+      },
+      "frameworkVersion": "^2.x",
+      "provider": {
+        "$ref": "$[\"service\"][\"provider\"]"
+      },
+      "resources": {
+        "$ref": "$[\"service\"][\"resources\"]"
+      }
+    },
+    "isDashboardMonitoringPreconfigured": false
+  },
+  "package": {
+    "artifactDirectoryName": "serverless/list-users-fargate/dev/1634589792962-2021-10-18T20:43:12.962Z",
+    "artifact": ""
+  }
+}
